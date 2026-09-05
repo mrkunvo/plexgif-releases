@@ -1,0 +1,40 @@
+# Công bố bản nháp đã dựng sẵn, đúng giờ đã hẹn.
+#
+# GitHub KHÔNG có tính năng hẹn giờ phát hành.  Cách duy nhất chạy trên máy
+# chủ của GitHub (không phụ thuộc máy ai có bật hay không) là một workflow
+# chạy theo lịch, tới giờ thì gỡ cờ "bản nháp" của release.
+#
+# Cron của GitHub tính theo giờ UTC và KHÔNG có ô năm, nên:
+#   * 18:00 UTC ngày 12/09  =  01:00 giờ Việt Nam ngày 13/09
+#   * bước kiểm ngày bên dưới chặn những năm sau — không có nó thì cứ tới
+#     12/09 hằng năm là workflow lại chạy.
+name: Phát hành theo lịch
+
+on:
+  schedule:
+    - cron: "0 18 12 9 *"
+  workflow_dispatch:          # bấm tay được, phòng khi muốn phát hành sớm
+
+permissions:
+  contents: write
+
+jobs:
+  cong-bo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gỡ cờ bản nháp của v2.7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          HOM_NAY="$(date -u +%F)"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$HOM_NAY" != "2026-09-12" ]; then
+            echo "Hôm nay $HOM_NAY (UTC), không phải mốc đã hẹn — bỏ qua."
+            exit 0
+          fi
+          if ! gh release view v2.7 --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Không thấy v2.7 — có thể đã công bố và đổi tên rồi.  Bỏ qua."
+            exit 0
+          fi
+          gh release edit v2.7 --repo "${{ github.repository }}" --draft=false --latest
+          echo "Đã công bố PlexGIF 2.7 lúc $(date -u +'%F %T') UTC."
